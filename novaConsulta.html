@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Nova Consulta</title>
+  <style>
+    .form-select-status {
+      width: 140px;
+      margin: 0 auto;
+      text-align: center;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .dropdown-status {
+      position: relative;
+      display: inline-block;
+      width: 140px;
+      text-align: center;
+      font-weight: bold;
+      margin: 0 auto;
+    }
+    .dropdown-status-btn {
+      width: 100%;
+      padding: .375rem .75rem;
+      border: 1px solid #ced4da;
+      border-radius: .25rem;
+      color: #fff;
+      text-align: center;
+      cursor: pointer;
+    }
+    .dropdown-status-menu {
+      display: none;
+      position: absolute;
+      background-color: #fff;
+      min-width: 100%;
+      border: 1px solid #ced4da;
+      border-radius: .25rem;
+      z-index: 1000;
+      text-align: center;
+      box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+    }
+    .dropdown-status-menu div {
+      padding: .375rem .75rem;
+      cursor: pointer;
+      color: #fff;
+      font-weight: bold;
+    }
+    .dropdown-status-menu div:hover {
+      opacity: 0.8;
+    }
+    .status-agendada { background-color: #f0ad4e; }
+    .status-confirmada { background-color: #5bc0de; }
+    .status-cancelada { background-color: #d9534f; }
+    .status-finalizada { background-color: #5cb85c; }
+  </style>
+</head>
+<body class="bg-light">
+<div class="d-flex">
+
+  <!-- Sidebar -->
+  <div class="bg-primary text-white p-3" style="width: 250px; min-height: 100vh;">
+    <h4><a href="principal.html" class="text-white text-decoration-none">Agenda Médica</a></h4>
+    <hr>
+    <ul class="nav nav-pills flex-column">
+      <li class="nav-item"><a href="novaConsulta.html" class="nav-link text-white">Nova Consulta</a></li>
+      <li class="nav-item"><a href="listaDeConsultas.html" class="nav-link text-white">Consultas</a></li>
+      <li class="nav-item"><a href="medicos.html" class="nav-link text-white">Médicos</a></li>
+      <li class="nav-item"><a href="pacientes.html" class="nav-link text-white">Pacientes</a></li>
+    </ul>
+  </div>
+
+  <!-- Conteúdo -->
+  <div class="flex-fill p-4">
+    <h2>Agendar Nova Consulta</h2>
+    <form id="formNovaConsulta">
+      <div class="mb-3">
+        <label for="medicoSelect" class="form-label">Médico</label>
+        <select id="medicoSelect" class="form-select" required></select>
+      </div>
+
+      <div class="mb-3">
+        <label for="pacienteSelect" class="form-label">Paciente</label>
+        <select id="pacienteSelect" class="form-select" required></select>
+      </div>
+
+      <div class="mb-3">
+        <label for="dataConsulta" class="form-label">Data</label>
+        <input type="date" id="dataConsulta" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label for="horarioConsulta" class="form-label">Horário</label>
+        <input type="time" id="horarioConsulta" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Status:</label>
+        <div class="dropdown-status" id="dropdownStatus">
+          <div class="dropdown-status-btn status-agendada" id="statusSelecionado">AGENDADA</div>
+          <div class="dropdown-status-menu">
+            <div class="status-agendada" data-value="AGENDADA">AGENDADA</div>
+            <div class="status-confirmada" data-value="CONFIRMADA">CONFIRMADA</div>
+            <div class="status-cancelada" data-value="CANCELADA">CANCELADA</div>
+            <div class="status-finalizada" data-value="FINALIZADA">FINALIZADA</div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Agendar Consulta</button>
+    </form>
+    <div id="mensagem" class="mt-3"></div>
+  </div>
+</div>
+
+<script>
+async function carregarMedicos() {
+  try {
+    const res = await fetch('http://localhost:8080/api/medicos');
+    const medicos = await res.json();
+    const select = document.getElementById('medicoSelect');
+    select.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '-- Selecione um médico --';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    medicos.forEach(m => {
+      const option = document.createElement('option');
+      option.value = m.id;
+      option.textContent = m.nome;
+      select.appendChild(option);
+    });
+  } catch {
+    alert('Não foi possível carregar os médicos.');
+  }
+}
+
+async function carregarPacientes() {
+  try {
+    const res = await fetch('http://localhost:8080/api/pacientes');
+    const pacientes = await res.json();
+    const select = document.getElementById('pacienteSelect');
+    select.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '-- Selecione um paciente --';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    pacientes.forEach(p => {
+      const option = document.createElement('option');
+      option.value = p.id;
+      option.textContent = p.nome;
+      select.appendChild(option);
+    });
+  } catch {
+    alert('Não foi possível carregar os pacientes.');
+  }
+}
+
+// Dropdown customizado
+const dropdownBtn = document.getElementById('statusSelecionado');
+const dropdownMenu = document.querySelector('.dropdown-status-menu');
+let statusAtual = 'AGENDADA';
+
+function atualizarCorStatus() {
+  const statusClasses = {
+    AGENDADA: 'status-agendada',
+    CONFIRMADA: 'status-confirmada',
+    CANCELADA: 'status-cancelada',
+    FINALIZADA: 'status-finalizada'
+  };
+  dropdownBtn.className = 'dropdown-status-btn ' + statusClasses[statusAtual];
+  dropdownBtn.textContent = statusAtual;
+}
+
+dropdownBtn.addEventListener('click', () => {
+  dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+});
+
+dropdownMenu.querySelectorAll('div').forEach(item => {
+  item.addEventListener('click', () => {
+    statusAtual = item.getAttribute('data-value');
+    atualizarCorStatus();
+    dropdownMenu.style.display = 'none';
+  });
+});
+
+window.addEventListener('click', (e) => {
+  if (!document.getElementById('dropdownStatus').contains(e.target)) {
+    dropdownMenu.style.display = 'none';
+  }
+});
+
+// Envio do formulário com alerta amigável para horário ocupado
+document.getElementById('formNovaConsulta').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const dto = {
+    medicoId: document.getElementById('medicoSelect').value,
+    pacienteId: document.getElementById('pacienteSelect').value,
+    data: document.getElementById('dataConsulta').value,
+    horario: document.getElementById('horarioConsulta').value,
+    status: statusAtual
+  };
+  try {
+    const res = await fetch('http://localhost:8080/api/consultas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dto)
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.message || 'Erro ao agendar consulta.');
+    }
+    document.getElementById('mensagem').innerHTML =
+      '<div class="alert alert-success">Consulta agendada com sucesso!</div>';
+    document.getElementById('formNovaConsulta').reset();
+    statusAtual = 'AGENDADA';
+    atualizarCorStatus();
+  } catch (err) {
+    document.getElementById('mensagem').innerHTML =
+      '<div class="alert alert-warning">⚠ ' + err.message + '</div>';
+  }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  carregarMedicos();
+  carregarPacientes();
+  atualizarCorStatus();
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

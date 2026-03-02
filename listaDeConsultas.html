@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Lista de Consultas</title>
+  <style>
+    /* Cores para cada status aplicadas aos <td> da linha */
+    .status-agendada td { background-color: #f0ad4e !important; color: white; }
+    .status-confirmada td { background-color: #5bc0de !important; color: white; }
+    .status-cancelada td { background-color: #d9534f !important; color: white; }
+    .status-finalizada td { background-color: #5cb85c !important; color: white; }
+
+    .form-select-status {
+      width: auto;
+      display: block;
+      text-align: center;
+      margin: 0 auto;
+      width: 160px;
+    }
+
+    .filtro-container {
+      margin-bottom: 20px;
+    }
+
+    .filtro-data {
+      max-width: 200px;
+    }
+  </style>
+</head>
+
+<body class="bg-light">
+
+<div class="d-flex">
+
+  <!-- Sidebar -->
+  <div class="bg-primary text-white p-3" style="width: 250px; min-height: 100vh;">
+    <h4><a href="principal.html" class="text-white text-decoration-none">Agenda Médica</a></h4>
+    <hr>
+    <ul class="nav nav-pills flex-column">
+      <li class="nav-item"><a href="novaConsulta.html" class="nav-link text-white">Nova Consulta</a></li>
+      <li class="nav-item"><a href="listaDeConsultas.html" class="nav-link text-white">Consultas</a></li>
+      <li class="nav-item"><a href="medicos.html" class="nav-link text-white">Médicos</a></li>
+      <li class="nav-item"><a href="pacientes.html" class="nav-link text-white">Pacientes</a></li>
+    </ul>
+  </div>
+
+  <!-- Conteúdo principal -->
+  <div class="flex-fill p-4">
+    <h2>Consultas Agendadas</h2>
+
+    <!-- Filtro por data -->
+    <div class="d-flex align-items-center gap-2 filtro-container">
+      <label for="filtroData" class="form-label mb-0">Filtrar por data:</label>
+      <input type="date" id="filtroData" class="form-control filtro-data">
+      <button id="limparFiltro" class="btn btn-secondary">Limpar</button>
+    </div>
+
+    <table class="table table-bordered align-middle text-center">
+      <thead>
+        <tr>
+          <th>Médico</th>
+          <th>Paciente</th>
+          <th>Data</th>
+          <th>Horário</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="consultasBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API_URL = 'http://localhost:8080/api/consultas';
+const STATUS_OPTIONS = ["AGENDADA", "CONFIRMADA", "CANCELADA", "FINALIZADA"];
+const STATUS_CLASSES = {
+  "AGENDADA": "status-agendada",
+  "CONFIRMADA": "status-confirmada",
+  "CANCELADA": "status-cancelada",
+  "FINALIZADA": "status-finalizada"
+};
+
+let todasConsultas = []; // armazena todas as consultas para filtrar
+
+async function carregarConsultas() {
+  try {
+    const res = await fetch(API_URL);
+    const consultas = await res.json();
+    todasConsultas = consultas;
+    renderizarTabela(consultas);
+  } catch (err) {
+    document.getElementById('consultasBody').innerHTML = '<tr><td colspan="5">Erro ao carregar consultas.</td></tr>';
+  }
+}
+
+function renderizarTabela(consultas) {
+  const tbody = document.getElementById('consultasBody');
+  tbody.innerHTML = '';
+
+  consultas.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.className = STATUS_CLASSES[c.status] || '';
+
+    tr.innerHTML = `
+      <td>${c.medicoNome}</td>
+      <td>${c.pacienteNome}</td>
+      <td>${c.data}</td>
+      <td>${c.horario}</td>
+    `;
+
+    // Dropdown de status
+    const tdStatus = document.createElement('td');
+    const statusSelect = document.createElement('select');
+    statusSelect.className = 'form-select form-select-status';
+    STATUS_OPTIONS.forEach(s => {
+      const option = document.createElement('option');
+      option.value = s;
+      option.text = s;
+      if (s === c.status) option.selected = true;
+      statusSelect.appendChild(option);
+    });
+
+    statusSelect.addEventListener('change', async () => {
+      const novoStatus = statusSelect.value;
+      try {
+        const res = await fetch(`${API_URL}/${c.id}/status?status=${novoStatus}`, { method: 'PATCH' });
+        if (!res.ok) throw new Error('Falha ao atualizar status');
+
+        // Atualiza a linha com a nova cor
+        tr.className = STATUS_CLASSES[novoStatus] || '';
+
+        // Atualiza o status também no array de todasConsultas para manter o estado correto
+        const index = todasConsultas.findIndex(item => item.id === c.id);
+        if (index !== -1) {
+          todasConsultas[index].status = novoStatus;
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Não foi possível atualizar o status.");
+      }
+    });
+
+    tdStatus.appendChild(statusSelect);
+    tr.appendChild(tdStatus);
+    tbody.appendChild(tr);
+  });
+}
+
+// Filtro por data
+document.getElementById('filtroData').addEventListener('change', () => {
+  const dataFiltro = document.getElementById('filtroData').value;
+  if (!dataFiltro) {
+    renderizarTabela(todasConsultas);
+  } else {
+    const filtradas = todasConsultas.filter(c => c.data === dataFiltro);
+    renderizarTabela(filtradas);
+  }
+});
+
+// Botão limpar filtro
+document.getElementById('limparFiltro').addEventListener('click', () => {
+  document.getElementById('filtroData').value = '';
+  renderizarTabela(todasConsultas);
+});
+
+// Carrega ao abrir a página
+window.addEventListener('DOMContentLoaded', () => {
+  carregarConsultas();
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
