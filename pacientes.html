@@ -27,10 +27,9 @@
   </div>
 
   <!-- Conteúdo -->
-  <div class="flex-fill p-4" id="conteudoPrincipal">
+  <div class="flex-fill p-4">
     <h2>Cadastro de Pacientes</h2>
 
-    <!-- FORMULÁRIO -->
     <form id="formPaciente">
       <div class="mb-3">
         <label for="nome" class="form-label">Nome:</label>
@@ -39,12 +38,14 @@
 
       <div class="mb-3">
         <label for="cpf" class="form-label">CPF:</label>
-        <input type="text" id="cpf" class="form-control" required>
+        <input type="text" id="cpf" class="form-control" maxlength="14" required>
       </div>
 
       <div class="mb-3">
         <label for="dataNascimento" class="form-label">Data de Nascimento:</label>
-        <input type="date" id="dataNascimento" class="form-control" required>
+        <input type="date" id="dataNascimento" class="form-control"
+               required
+               min="1900-01-01">
       </div>
 
       <button type="submit" class="btn btn-primary" id="btnSalvar">Cadastrar</button>
@@ -55,7 +56,6 @@
 
     <hr>
 
-    <!-- TABELA -->
     <h3>Pacientes Cadastrados</h3>
     <table class="table table-bordered align-middle text-center">
       <thead>
@@ -80,27 +80,107 @@ const mensagemPaciente = document.getElementById("mensagemPaciente");
 const pacientesBody = document.getElementById("pacientesBody");
 const btnSalvar = document.getElementById("btnSalvar");
 const btnCancelar = document.getElementById("btnCancelar");
+const cpfInput = document.getElementById("cpf");
+const dataInput = document.getElementById("dataNascimento");
 
 let pacientes = [];
 let editandoId = null;
 
-// ============================
-// CARREGAR PACIENTES
-// ============================
+/* ============================
+   DEFINIR DATA MÁXIMA COMO HOJE
+============================ */
+function definirDataMaximaHoje() {
+  const hoje = new Date();
+  const yyyy = hoje.getFullYear();
+  const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dd = String(hoje.getDate()).padStart(2, '0');
+  const hojeFormatado = `${yyyy}-${mm}-${dd}`;
+  dataInput.setAttribute("max", hojeFormatado);
+}
+
+definirDataMaximaHoje();
+
+/* ============================
+   MÁSCARA CPF
+============================ */
+cpfInput.addEventListener("input", function () {
+  let valor = this.value.replace(/\D/g, "");
+  valor = valor.substring(0, 11);
+
+  valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
+  valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
+  valor = valor.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+
+  this.value = valor;
+});
+
+/* ============================
+   VALIDAÇÃO CPF
+============================ */
+function cpfValidoBasico(cpf) {
+  cpf = cpf.replace(/\D/g, "");
+  return cpf.length === 11;
+}
+
+/* ============================
+   VALIDAÇÃO DATA COMPLETA
+============================ */
+function dataValida(data) {
+
+  if (!data) return false;
+
+  const regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!regex.test(data)) return false;
+
+  const [ano] = data.split("-");
+  if (ano.length !== 4) return false;
+
+  const dataObj = new Date(data);
+  if (isNaN(dataObj.getTime())) return false;
+
+  const hoje = new Date();
+  hoje.setHours(0,0,0,0);
+
+  if (dataObj > hoje) return false; // BLOQUEIA DATA FUTURA
+
+  return true;
+}
+
+/* ============================
+   FORMATAR DATA BR
+============================ */
+function formatarDataBR(dataISO) {
+  if (!dataISO) return '';
+  const [ano, mes, dia] = dataISO.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+/* ============================
+   FORMATAR CPF
+============================ */
+function formatarCPF(cpf) {
+  if (!cpf) return '';
+  cpf = cpf.replace(/\D/g, "");
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,
+    "$1.$2.$3-$4");
+}
+
+/* ============================
+   CARREGAR PACIENTES
+============================ */
 async function carregarPacientes() {
   try {
     const res = await fetch(API_URL);
     pacientes = await res.json();
     renderizarTabela();
-  } catch (err) {
+  } catch {
     pacientesBody.innerHTML = '<tr><td colspan="4">Erro ao carregar pacientes.</td></tr>';
-    console.error(err);
   }
 }
 
-// ============================
-// RENDERIZAR TABELA
-// ============================
+/* ============================
+   RENDERIZAR TABELA
+============================ */
 function renderizarTabela() {
   pacientesBody.innerHTML = '';
 
@@ -109,8 +189,8 @@ function renderizarTabela() {
 
     tr.innerHTML = `
       <td>${p.nome}</td>
-      <td>${p.cpf}</td>
-      <td>${p.dataNascimento}</td>
+      <td>${formatarCPF(p.cpf)}</td>
+      <td>${formatarDataBR(p.dataNascimento)}</td>
       <td>
         <button class="btn btn-sm btn-warning me-1" onclick="editarPaciente(${p.id})">Editar</button>
         <button class="btn btn-sm btn-danger" onclick="excluirPaciente(${p.id})">Excluir</button>
@@ -121,73 +201,96 @@ function renderizarTabela() {
   });
 }
 
-// ============================
-// CADASTRAR OU ATUALIZAR
-// ============================
+/* ============================
+   SUBMIT
+============================ */
 formPaciente.addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  mensagemPaciente.innerHTML = "";
+
+  const cpfLimpo = cpfInput.value.replace(/\D/g, "");
+  const dataNascimento = dataInput.value;
+
+  if (!cpfValidoBasico(cpfLimpo)) {
+    mensagemPaciente.innerHTML =
+      `<div class="alert alert-danger">CPF deve conter 11 dígitos.</div>`;
+    return;
+  }
+
+  if (!dataValida(dataNascimento)) {
+    mensagemPaciente.innerHTML =
+      `<div class="alert alert-danger">
+        Data de nascimento inválida. Não é permitido ano futuro.
+      </div>`;
+    return;
+  }
+
   const paciente = {
     nome: document.getElementById("nome").value,
-    cpf: document.getElementById("cpf").value,
-    dataNascimento: document.getElementById("dataNascimento").value
+    cpf: cpfLimpo,
+    dataNascimento: dataNascimento
   };
 
   try {
-    let res;
 
-    if (editandoId) {
-      // Atualizar
-      res = await fetch(`${API_URL}/${editandoId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(paciente)
-      });
-    } else {
-      // Cadastrar
-      res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(paciente)
-      });
-    }
+    const metodo = editandoId ? "PUT" : "POST";
+    const url = editandoId ? `${API_URL}/${editandoId}` : API_URL;
 
-    if (res.ok) {
-      mensagemPaciente.innerHTML =
-        `<div class="alert alert-success">
-          ${editandoId ? "Paciente atualizado" : "Paciente cadastrado"} com sucesso!
-        </div>`;
+    const res = await fetch(url, {
+      method: metodo,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(paciente)
+    });
 
-      formPaciente.reset();
-      editandoId = null;
-      btnSalvar.textContent = "Cadastrar";
-      btnCancelar.style.display = "none";
-      await carregarPacientes();
-    } else {
+    let mensagemErroBackend = "";
+
+    try {
+      const erroJson = await res.json();
+      mensagemErroBackend = erroJson.message || "";
+    } catch {}
+
+    if (res.status === 409 || mensagemErroBackend.toUpperCase().includes("CPF")) {
       mensagemPaciente.innerHTML =
         `<div class="alert alert-danger">
-          Erro ao ${editandoId ? "atualizar" : "cadastrar"} paciente.
+          Já existe um paciente cadastrado com este CPF.
         </div>`;
+      return;
     }
 
-  } catch (err) {
+    if (!res.ok) {
+      mensagemPaciente.innerHTML =
+        `<div class="alert alert-danger">Erro ao salvar paciente.</div>`;
+      return;
+    }
+
     mensagemPaciente.innerHTML =
-      `<div class="alert alert-danger">
-        Erro ao ${editandoId ? "atualizar" : "cadastrar"} paciente.
+      `<div class="alert alert-success">
+        ${editandoId ? "Paciente atualizado" : "Paciente cadastrado"} com sucesso!
       </div>`;
-    console.error(err);
+
+    formPaciente.reset();
+    editandoId = null;
+    btnSalvar.textContent = "Cadastrar";
+    btnCancelar.style.display = "none";
+
+    await carregarPacientes();
+
+  } catch {
+    mensagemPaciente.innerHTML =
+      `<div class="alert alert-danger">Erro ao conectar com o servidor.</div>`;
   }
 });
 
-// ============================
-// EDITAR
-// ============================
+/* ============================
+   EDITAR
+============================ */
 function editarPaciente(id) {
   const paciente = pacientes.find(p => p.id === id);
   if (!paciente) return;
 
   document.getElementById("nome").value = paciente.nome;
-  document.getElementById("cpf").value = paciente.cpf;
+  document.getElementById("cpf").value = formatarCPF(paciente.cpf);
   document.getElementById("dataNascimento").value = paciente.dataNascimento;
 
   editandoId = id;
@@ -195,9 +298,9 @@ function editarPaciente(id) {
   btnCancelar.style.display = "inline-block";
 }
 
-// ============================
-// CANCELAR EDIÇÃO
-// ============================
+/* ============================
+   CANCELAR
+============================ */
 btnCancelar.addEventListener("click", () => {
   formPaciente.reset();
   editandoId = null;
@@ -205,45 +308,16 @@ btnCancelar.addEventListener("click", () => {
   btnCancelar.style.display = "none";
 });
 
-// ============================
-// EXCLUIR
-// ============================
+/* ============================
+   EXCLUIR
+============================ */
 async function excluirPaciente(id) {
   if (!confirm("Tem certeza que deseja excluir este paciente?")) return;
-
-  try {
-    const res = await fetch(`${API_URL}/${id}`, {
-      method: "DELETE"
-    });
-
-    if (res.status === 204 || res.ok) {
-      mensagemPaciente.innerHTML =
-        `<div class="alert alert-success">
-          Paciente excluído com sucesso!
-        </div>`;
-      await carregarPacientes();
-    } else {
-      mensagemPaciente.innerHTML =
-        `<div class="alert alert-danger">
-          Erro ao excluir paciente.
-        </div>`;
-    }
-
-  } catch (err) {
-    mensagemPaciente.innerHTML =
-      `<div class="alert alert-danger">
-        Erro ao excluir paciente.
-      </div>`;
-    console.error(err);
-  }
+  await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+  await carregarPacientes();
 }
 
-// ============================
-// INICIALIZAÇÃO
-// ============================
-window.addEventListener("DOMContentLoaded", () => {
-  carregarPacientes();
-});
+window.addEventListener("DOMContentLoaded", carregarPacientes);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
